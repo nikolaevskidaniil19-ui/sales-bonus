@@ -1,6 +1,7 @@
 # Проектная работа "Пряники"
 
 5 спринт, модуль JS
+
 https://github.com/nikolaevskidaniil19-ui/sales-bonus
 
 ## Описание проекта
