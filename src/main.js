@@ -105,17 +105,24 @@ function analyzeSalesData(data, options) {
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
+    // ВОТ ЭТОТ БЛОК НУЖНО ЗАМЕНИТЬ:
+    const topProducts = Object.entries(seller.products_sold)
+      .map(([sku, quantity]) => ({ sku, quantity }))
+      .sort((a, b) => {
+        // Сначала сортируем по количеству (от большего к меньшему)
+        if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+        // Если количество равно — сортируем по SKU (как числа: 1, 2, 10...)
+        return a.sku.localeCompare(b.sku, undefined, { numeric: true });
+      })
+      .slice(0, 10);
+
     return {
-      seller_id: String(seller.id),
+      seller_id: seller.id,
       name: seller.name,
-      revenue: Number(seller.revenue.toFixed(2)),
-      profit: Number(seller.profit.toFixed(2)),
+      revenue: seller.revenue,
+      profit: seller.profit,
       sales_count: seller.sales_count,
-      top_products: Object.entries(seller.products_sold)
-        .map(([sku, quantity]) => ({ sku, quantity }))
-        .sort((a, b) => b.quantity - a.quantity || a.sku.localeCompare(b.sku))
-        .slice(0, 10),
-      // ИСПОЛЬЗУЕМ Math.round для бонуса, чтобы .565 стало .57
+      top_products: topProducts,
       bonus: Math.round(bonusAmount * 100) / 100,
     };
   });
