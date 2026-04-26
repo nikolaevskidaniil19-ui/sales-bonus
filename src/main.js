@@ -112,8 +112,10 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // ОБРАТНЫЙ ПОРЯДОК: SKU_041 будет выше SKU_004
-        return b.sku.localeCompare(a.sku);
+        // Обратный порядок (Z-A) для SKU
+        if (a.sku < b.sku) return 1;
+        if (a.sku > b.sku) return -1;
+        return 0;
       })
       .slice(0, 10);
 
