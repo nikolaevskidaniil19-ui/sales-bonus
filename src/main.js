@@ -48,16 +48,35 @@ function analyzeSalesData(data, options) {
   // @TODO: Назначение премий на основе ранжирования
 
   // @TODO: Подготовка итоговой коллекции с нужными полями
-  if (!data || !data.sellers || !data.products || !data.purchase_records) {
+  if (
+    !data ||
+    !Array.isArray(data.sellers) ||
+    !Array.isArray(data.products) ||
+    !Array.isArray(data.purchase_records)
+  ) {
     throw new Error("Некорректные входные данные");
+  }
+
+  // 2. Проверка на ПУСТЫЕ массивы (исправляет ваши упавшие тесты)
+  if (
+    data.sellers.length === 0 ||
+    data.products.length === 0 ||
+    data.purchase_records.length === 0
+  ) {
+    throw new Error("Данные не могут быть пустыми");
+  }
+
+  // 3. Проверка наличия функций расчета в options
+  if (!options || !options.calculateRevenue || !options.calculateBonus) {
+    throw new Error("Отсутствуют функции расчета");
   }
 
   const { calculateRevenue, calculateBonus } = options;
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
 
-  // Сбор статистики
+  // Подготовка данных продавцов
   const sellerStats = data.sellers.map((seller) => ({
-    id: String(seller.id), // Сразу делаем строкой
+    id: String(seller.id),
     name: `${seller.first_name} ${seller.last_name}`,
     revenue: 0,
     profit: 0,
@@ -67,6 +86,7 @@ function analyzeSalesData(data, options) {
 
   const sellerIndex = Object.fromEntries(sellerStats.map((s) => [s.id, s]));
 
+  // Обработка записей о продажах
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
@@ -90,24 +110,26 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // Округляем прибыль ПЕРЕД сортировкой (важно для стабильности рейтинга)
+  // Округляем показатели ПЕРЕД сортировкой для точности рейтинга
   sellerStats.forEach((s) => {
     s.profit = +s.profit.toFixed(2);
     s.revenue = +s.revenue.toFixed(2);
   });
 
-  // Сортировка по прибыли (от большего к меньшему)
-  sellerStats.sort((a, b) => b.profit - a.profit);
+  // Сортировка: сначала по прибыли, если она равна — по ID (для стабильности тестов)
+  sellerStats.sort((a, b) => b.profit - a.profit || a.id.localeCompare(b.id));
 
+  // Формирование итогового массива
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({
-        sku: Number(sku), // SKU часто должен быть числом
+        sku: Number(sku),
         quantity,
       }))
-      .sort((a, b) => b.quantity - a.quantity || a.sku - b.sku) // Доп. сортировка по SKU
+      // Сортировка ТОП-товаров: по количеству, при равенстве — по SKU
+      .sort((a, b) => b.quantity - a.quantity || a.sku - b.sku)
       .slice(0, 10);
 
     return {
