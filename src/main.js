@@ -6,8 +6,8 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  const priceWithDiscount = purchase.sale_price * (1 - purchase.discount / 100);
-  return priceWithDiscount * purchase.quantity;
+  const totalBeforeDiscount = purchase.sale_price * purchase.quantity;
+  return totalBeforeDiscount * (1 - purchase.discount / 100);
 }
 
 /**
@@ -125,11 +125,10 @@ function analyzeSalesData(data, options) {
 
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({
-        sku: Number(sku),
-        quantity,
+        sku: sku, // Убираем Number(), оставляем как есть (строку "SKU_023")
+        quantity: quantity,
       }))
-      // Сортировка ТОП-товаров: по количеству, при равенстве — по SKU
-      .sort((a, b) => b.quantity - a.quantity || a.sku - b.sku)
+      .sort((a, b) => b.quantity - a.quantity || a.sku.localeCompare(b.sku))
       .slice(0, 10);
 
     return {
