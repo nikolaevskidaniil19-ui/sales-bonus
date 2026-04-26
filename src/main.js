@@ -6,9 +6,9 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  const res =
-    (purchase.sale_price * purchase.quantity * (100 - purchase.discount)) / 100;
-  return Math.round(res * 100) / 100;
+  return (
+    (purchase.sale_price * purchase.quantity * (100 - purchase.discount)) / 100
+  );
 }
 
 /**
@@ -68,7 +68,6 @@ function analyzeSalesData(data, options) {
   const { calculateRevenue, calculateBonus } = options;
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
 
-  // 2. Подготовка статистики
   const sellerStats = data.sellers.map((seller) => ({
     id: String(seller.id),
     name: `${seller.first_name} ${seller.last_name}`,
@@ -80,7 +79,7 @@ function analyzeSalesData(data, options) {
 
   const sellerIndex = Object.fromEntries(sellerStats.map((s) => [s.id, s]));
 
-  // 3. Расчет данных (с округлением на каждом шаге для точности JS)
+  // 2. Сбор данных БЕЗ округления на каждом шаге
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
@@ -93,10 +92,9 @@ function analyzeSalesData(data, options) {
         const itemRevenue = calculateRevenue(item, product);
         const cost = product.purchase_price * item.quantity;
 
-        // Математический хак: округляем каждое сложение, чтобы не было "хвостов" вроде .000000013
-        seller.revenue = Math.round((seller.revenue + itemRevenue) * 100) / 100;
-        seller.profit =
-          Math.round((seller.profit + (itemRevenue - cost)) * 100) / 100;
+        // Копим значения как есть, не округляем здесь
+        seller.revenue += itemRevenue;
+        seller.profit += itemRevenue - cost;
 
         seller.products_sold[item.sku] =
           (seller.products_sold[item.sku] || 0) + item.quantity;
@@ -104,34 +102,42 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // 4. Сортировка: сначала по прибыли, при равенстве — по ID
+  // 3. Сортировка продавцов
   sellerStats.sort((a, b) => {
-    if (Math.abs(b.profit - a.profit) > 0.001) return b.profit - a.profit;
+    if (Math.abs(b.profit - a.profit) > 0.01) return b.profit - a.profit;
     return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 
-  // 5. Формирование итогового отчета
+  // 4. Формирование результата
   return sellerStats.map((seller, index, array) => {
-    const bonusAmount = calculateBonus(index, array.length, seller);
+    // Округляем прибыль и выручку только перед расчетом бонуса и возвратом
+    const roundedProfit = Math.round(seller.profit * 100) / 100;
+    const roundedRevenue = Math.round(seller.revenue * 100) / 100;
 
-    // Сначала создаем переменную topProducts
+    // Передаем в бонус округленную прибыль
+    const bonusAmount = calculateBonus(index, array.length, {
+      ...seller,
+      profit: roundedProfit,
+    });
+
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        return a.sku.localeCompare(b.sku, undefined, { numeric: true });
+        // Строгая алфавитная сортировка для SKU (исправляет падение на SKU_049/081)
+        if (a.sku < b.sku) return -1;
+        if (a.sku > b.sku) return 1;
+        return 0;
       })
       .slice(0, 10);
 
-    // А теперь возвращаем объект, где она используется
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue,
-      profit: seller.profit,
+      revenue: roundedRevenue,
+      profit: roundedProfit,
       sales_count: seller.sales_count,
-      top_products: topProducts, // Теперь переменная точно определена выше
-      // Используем EPSILON, чтобы Алексей Петров получил 2834.57
+      top_products: topProducts,
       bonus: Math.round((bonusAmount + Number.EPSILON) * 100) / 100,
     };
   });
