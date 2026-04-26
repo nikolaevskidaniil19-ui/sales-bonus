@@ -82,19 +82,16 @@ function analyzeSalesData(data, options) {
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
-
     seller.sales_count += 1;
     record.items.forEach((item) => {
       const product = productIndex[item.sku];
       if (product) {
-        const itemRevenue = calculateRevenue(item, product); // Здесь уже 2 знака
+        const itemRevenue = calculateRevenue(item, product);
         const cost = product.purchase_price * item.quantity;
 
-        const itemProfit = itemRevenue - cost;
-
-        seller.revenue = Math.round((seller.revenue + itemRevenue) * 100) / 100;
-        // Округляем прибыль после каждого добавленного товара
-        seller.profit = Math.round((seller.profit + itemProfit) * 100) / 100;
+        // СУММИРУЕМ БЕЗ Math.round
+        seller.revenue += itemRevenue;
+        seller.profit += itemRevenue - cost;
 
         seller.products_sold[item.sku] =
           (seller.products_sold[item.sku] || 0) + item.quantity;
@@ -115,16 +112,16 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // Исправлено на алфавитный порядок (A-Z)
-        return a.sku.localeCompare(b.sku);
+        // ОБРАТНЫЙ ПОРЯДОК: SKU_041 будет выше SKU_004
+        return b.sku.localeCompare(a.sku);
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue, // уже округлено
-      profit: seller.profit, // уже округлено
+      revenue: Number(seller.revenue.toFixed(2)),
+      profit: Number(seller.profit.toFixed(2)),
       sales_count: seller.sales_count,
       top_products: topProducts,
       bonus: Number(bonusAmount.toFixed(2)),
