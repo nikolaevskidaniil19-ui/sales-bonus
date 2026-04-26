@@ -57,7 +57,6 @@ function analyzeSalesData(data, options) {
   ) {
     throw new Error("Некорректные входные данные");
   }
-
   if (
     data.sellers.length === 0 ||
     data.products.length === 0 ||
@@ -69,7 +68,7 @@ function analyzeSalesData(data, options) {
   const { calculateRevenue, calculateBonus } = options;
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
 
-  // 2. Инициализация статистики продавцов
+  // 2. Инициализация статистики
   const sellerStats = data.sellers.map((seller) => ({
     id: String(seller.id),
     name: `${seller.first_name} ${seller.last_name}`,
@@ -112,9 +111,9 @@ function analyzeSalesData(data, options) {
 
   // 5. Формирование итогового отчета
   return sellerStats.map((seller, index, array) => {
-    // Округляем прибыль и выручку ДО расчета бонуса (исправляет копейки Петрова)
-    const roundedProfit = Math.round(seller.profit * 100) / 100;
-    const roundedRevenue = Math.round(seller.revenue * 100) / 100;
+    // Округляем прибыль и выручку через toFixed(2)
+    const roundedRevenue = +seller.revenue.toFixed(2);
+    const roundedProfit = +seller.profit.toFixed(2);
 
     // Считаем бонус от округленной прибыли
     const bonusAmount = calculateBonus(index, array.length, {
@@ -122,12 +121,12 @@ function analyzeSalesData(data, options) {
       profit: roundedProfit,
     });
 
-    // ТОП-10 товаров с алфавитной сортировкой при равном количестве
+    // ТОП-10 товаров с алфавитной сортировкой (от A до Z)
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        return a.sku.localeCompare(b.sku); // По возрастанию (SK_004 выше SKU_041)
+        return a.sku.localeCompare(b.sku);
       })
       .slice(0, 10);
 
@@ -138,8 +137,8 @@ function analyzeSalesData(data, options) {
       profit: roundedProfit,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      // Микро-добавка для корректного округления .565 -> .57
-      bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
+      // Используем стандартное округление toFixed(2) для получения .56
+      bonus: +bonusAmount.toFixed(2),
     };
   });
 }
