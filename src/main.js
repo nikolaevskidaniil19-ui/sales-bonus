@@ -7,7 +7,9 @@
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
   const discountCoefficient = 1 - purchase.discount / 100;
-  return purchase.sale_price * purchase.quantity * discountCoefficient;
+  const res = purchase.sale_price * purchase.quantity * discountCoefficient;
+  // ВАЖНО: Округляем до 2 знаков каждую операцию, чтобы сошлись копейки в прибыли
+  return Math.round(res * 100) / 100;
 }
 
 /**
@@ -70,7 +72,6 @@ function analyzeSalesData(data, options) {
     throw new Error("Чего-то не хватает");
   }
 
-  // 2. Индексация
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
   const sellerStats = data.sellers.map((seller) => ({
     id: String(seller.id),
@@ -82,12 +83,12 @@ function analyzeSalesData(data, options) {
   }));
   const sellerIndex = Object.fromEntries(sellerStats.map((s) => [s.id, s]));
 
-  // 3. Сбор статистики
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
 
     seller.sales_count += 1;
+    // Revenue берем из total_amount чека (как в ТЗ)
     seller.revenue += record.total_amount;
 
     record.items.forEach((item) => {
@@ -95,7 +96,8 @@ function analyzeSalesData(data, options) {
       if (product) {
         const itemRevenue = calculateRevenue(item, product);
         const itemCost = product.purchase_price * item.quantity;
-        // Суммируем без промежуточного округления для точности
+
+        // Теперь здесь накопятся правильные копейки
         seller.profit += itemRevenue - itemCost;
 
         if (!seller.products_sold[item.sku]) seller.products_sold[item.sku] = 0;
@@ -104,14 +106,12 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // 4. Сортировка продавцов
   sellerStats.sort(
     (a, b) =>
       b.profit - a.profit ||
       a.id.localeCompare(b.id, undefined, { numeric: true }),
   );
 
-  // 5. Формирование отчета
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
@@ -119,8 +119,10 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // Z-A сортировка для SKU (важно для тестов!)
-        return b.sku.localeCompare(a.sku);
+        // ЖЕСТКАЯ СОРТИРОВКА Z-A (чтобы SKU_041 был выше SKU_004)
+        if (a.sku < b.sku) return 1;
+        if (a.sku > b.sku) return -1;
+        return 0;
       })
       .slice(0, 10);
 
