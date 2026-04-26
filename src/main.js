@@ -6,9 +6,9 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  return (
-    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100)
-  );
+  const res =
+    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100);
+  return Math.round(res * 100) / 100;
 }
 
 /**
@@ -124,21 +124,20 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // Строгий алфавитный порядок (исправляет сдвиг SKU в логах)
-        if (a.sku < b.sku) return -1;
-        if (a.sku > b.sku) return 1;
-        return 0;
+        // СОРТИРОВКА SKU: Извлекаем цифры из "SKU_054" и сравниваем как числа
+        const numA = parseInt(a.sku.match(/\d+/)) || 0;
+        const numB = parseInt(b.sku.match(/\d+/)) || 0;
+        return numA - numB;
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: roundedRevenue,
-      profit: roundedProfit,
+      revenue: Number(seller.revenue.toFixed(2)),
+      profit: Number(seller.profit.toFixed(2)),
       sales_count: seller.sales_count,
       top_products: topProducts,
-      // Используем EPSILON, чтобы превратить .565 в .57
       bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
     };
   });
