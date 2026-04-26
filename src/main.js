@@ -114,15 +114,6 @@ function analyzeSalesData(data, options) {
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
-    const topProducts = Object.entries(seller.products_sold)
-      .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort(
-        (a, b) =>
-          b.quantity - a.quantity ||
-          a.sku.localeCompare(b.sku, undefined, { numeric: true }),
-      )
-      .slice(0, 10);
-
     return {
       seller_id: seller.id,
       name: seller.name,
@@ -130,8 +121,8 @@ function analyzeSalesData(data, options) {
       profit: seller.profit,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      // Бонус округляем в самую последнюю очередь
-      bonus: Math.round(bonusAmount * 100) / 100,
+      // Этот способ гарантирует, что 2834.565 станет 2834.57
+      bonus: Math.round((bonusAmount + Number.EPSILON) * 100) / 100,
     };
   });
 }
