@@ -6,8 +6,9 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  const totalBeforeDiscount = purchase.sale_price * purchase.quantity;
-  return totalBeforeDiscount * (1 - purchase.discount / 100);
+  const priceWithDiscount = purchase.sale_price * (1 - purchase.discount / 100);
+  // Округляем выручку КАЖДОЙ строки чека сразу
+  return Math.round(priceWithDiscount * purchase.quantity * 100) / 100;
 }
 
 /**
@@ -94,10 +95,9 @@ function analyzeSalesData(data, options) {
         const itemRevenue = calculateRevenue(item, product);
         const cost = product.purchase_price * item.quantity;
 
-        // Копим без округления, чтобы не терять точность
         seller.revenue += itemRevenue;
+        // Прибыль считаем от уже округленной выручки
         seller.profit += itemRevenue - cost;
-
         if (!seller.products_sold[item.sku]) {
           seller.products_sold[item.sku] = 0;
         }
