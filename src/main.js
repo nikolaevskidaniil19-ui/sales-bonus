@@ -89,12 +89,13 @@ function analyzeSalesData(data, options) {
     record.items.forEach((item) => {
       const product = productIndex[item.sku];
       if (product) {
-        const itemRevenue = calculateRevenue(item, product);
+        const itemRevenue = calculateRevenue(item, product); // Здесь уже 2 знака
         const cost = product.purchase_price * item.quantity;
 
-        // Копим значения как есть, не округляем здесь
-        seller.revenue += itemRevenue;
-        seller.profit += itemRevenue - cost;
+        // 2. Накапливаем. Прибыль считаем от уже округленной выручки
+        seller.revenue = Math.round((seller.revenue + itemRevenue) * 100) / 100;
+        seller.profit =
+          Math.round((seller.profit + (itemRevenue - cost)) * 100) / 100;
 
         seller.products_sold[item.sku] =
           (seller.products_sold[item.sku] || 0) + item.quantity;
@@ -124,18 +125,18 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // СОРТИРОВКА SKU: Извлекаем цифры из "SKU_054" и сравниваем как числа
-        const numA = parseInt(a.sku.match(/\d+/)) || 0;
-        const numB = parseInt(b.sku.match(/\d+/)) || 0;
-        return numA - numB;
+        // 3. Алфавитный порядок (Алексей Petrov ждет именно это)
+        if (a.sku < b.sku) return -1;
+        if (a.sku > b.sku) return 1;
+        return 0;
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: Number(seller.revenue.toFixed(2)),
-      profit: Number(seller.profit.toFixed(2)),
+      revenue: seller.revenue, // Здесь уже будут чистые числа без хвостов
+      profit: seller.profit,
       sales_count: seller.sales_count,
       top_products: topProducts,
       bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
