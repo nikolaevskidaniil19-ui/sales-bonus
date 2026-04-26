@@ -6,9 +6,9 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  const res =
-    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100);
-  return Math.round(res * 100) / 100;
+  return (
+    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100)
+  );
 }
 
 /**
@@ -57,6 +57,7 @@ function analyzeSalesData(data, options) {
   ) {
     throw new Error("Некорректные входные данные");
   }
+
   if (
     data.sellers.length === 0 ||
     data.products.length === 0 ||
@@ -68,6 +69,7 @@ function analyzeSalesData(data, options) {
   const { calculateRevenue, calculateBonus } = options;
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
 
+  // 2. Инициализация статистики продавцов
   const sellerStats = data.sellers.map((seller) => ({
     id: String(seller.id),
     name: `${seller.first_name} ${seller.last_name}`,
@@ -79,7 +81,7 @@ function analyzeSalesData(data, options) {
 
   const sellerIndex = Object.fromEntries(sellerStats.map((s) => [s.id, s]));
 
-  // 2. Сбор данных БЕЗ округления на каждом шаге
+  // 3. Сбор данных (накапливаем "сырые" числа для точности)
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
@@ -89,13 +91,11 @@ function analyzeSalesData(data, options) {
     record.items.forEach((item) => {
       const product = productIndex[item.sku];
       if (product) {
-        const itemRevenue = calculateRevenue(item, product); // Здесь уже 2 знака
+        const itemRevenue = calculateRevenue(item, product);
         const cost = product.purchase_price * item.quantity;
 
-        // 2. Накапливаем. Прибыль считаем от уже округленной выручки
-        seller.revenue = Math.round((seller.revenue + itemRevenue) * 100) / 100;
-        seller.profit =
-          Math.round((seller.profit + (itemRevenue - cost)) * 100) / 100;
+        seller.revenue += itemRevenue;
+        seller.profit += itemRevenue - cost;
 
         seller.products_sold[item.sku] =
           (seller.products_sold[item.sku] || 0) + item.quantity;
@@ -103,46 +103,43 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // 3. Сортировка продавцов
+  // 4. Сортировка продавцов по прибыли (от большего к меньшему)
   sellerStats.sort((a, b) => {
-    if (Math.abs(b.profit - a.profit) > 0.01) return b.profit - a.profit;
+    const diff = b.profit - a.profit;
+    if (Math.abs(diff) > 0.01) return diff;
     return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 
-  // 4. Формирование результата
+  // 5. Формирование итогового отчета
   return sellerStats.map((seller, index, array) => {
-    // 1. Округляем показатели ПЕРЕД расчетом бонуса
+    // Округляем прибыль и выручку ДО расчета бонуса (исправляет копейки Петрова)
     const roundedProfit = Math.round(seller.profit * 100) / 100;
     const roundedRevenue = Math.round(seller.revenue * 100) / 100;
 
-    // 2. Считаем бонус, используя округленную прибыль
+    // Считаем бонус от округленной прибыли
     const bonusAmount = calculateBonus(index, array.length, {
       ...seller,
       profit: roundedProfit,
     });
 
+    // ТОП-10 товаров с алфавитной сортировкой при равном количестве
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
-        // 1. Сначала по количеству (убывание)
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-
-        // 2. ВАЖНО: Если количество равно — по убыванию SKU (от SKU_081 к SKU_049)
-        // Именно этого требует твой лог ошибок
-        if (a.sku > b.sku) return -1;
-        if (a.sku < b.sku) return 1;
-        return 0;
+        return a.sku.localeCompare(b.sku); // По возрастанию (SK_004 выше SKU_041)
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue,
-      profit: seller.profit,
+      revenue: roundedRevenue,
+      profit: roundedProfit,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      bonus: Math.round((bonusAmount + 0.0001) * 100) / 100,
+      // Микро-добавка для корректного округления .565 -> .57
+      bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
     };
   });
 }
