@@ -114,14 +114,24 @@ function analyzeSalesData(data, options) {
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
+    // Сначала создаем переменную topProducts
+    const topProducts = Object.entries(seller.products_sold)
+      .map(([sku, quantity]) => ({ sku, quantity }))
+      .sort((a, b) => {
+        if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+        return a.sku.localeCompare(b.sku, undefined, { numeric: true });
+      })
+      .slice(0, 10);
+
+    // А теперь возвращаем объект, где она используется
     return {
       seller_id: seller.id,
       name: seller.name,
       revenue: seller.revenue,
       profit: seller.profit,
       sales_count: seller.sales_count,
-      top_products: topProducts,
-      // Этот способ гарантирует, что 2834.565 станет 2834.57
+      top_products: topProducts, // Теперь переменная точно определена выше
+      // Используем EPSILON, чтобы Алексей Петров получил 2834.57
       bonus: Math.round((bonusAmount + Number.EPSILON) * 100) / 100,
     };
   });
