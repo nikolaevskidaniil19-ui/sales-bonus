@@ -6,9 +6,9 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  const discountMultiplier = (100 - purchase.discount) / 100;
-  const revenue = purchase.sale_price * purchase.quantity * discountMultiplier;
-  return Math.round(revenue * 100) / 100;
+  const res =
+    (purchase.sale_price * purchase.quantity * (100 - purchase.discount)) / 100;
+  return Math.round(res * 100) / 100;
 }
 
 /**
@@ -105,24 +105,18 @@ function analyzeSalesData(data, options) {
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
-    const topProducts = Object.entries(seller.products_sold)
-      .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort((a, b) => {
-        if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // Сортировка SKU по алфавиту/номеру
-        return a.sku.localeCompare(b.sku, undefined, { numeric: true });
-      })
-      .slice(0, 10);
-
     return {
-      seller_id: seller.id,
+      seller_id: String(seller.id),
       name: seller.name,
-      // Используем Number(x.toFixed(2)) — это самый стабильный способ для этих тестов
       revenue: Number(seller.revenue.toFixed(2)),
       profit: Number(seller.profit.toFixed(2)),
       sales_count: seller.sales_count,
-      top_products: topProducts,
-      bonus: Number(bonusAmount.toFixed(2)),
+      top_products: Object.entries(seller.products_sold)
+        .map(([sku, quantity]) => ({ sku, quantity }))
+        .sort((a, b) => b.quantity - a.quantity || a.sku.localeCompare(b.sku))
+        .slice(0, 10),
+      // ИСПОЛЬЗУЕМ Math.round для бонуса, чтобы .565 стало .57
+      bonus: Math.round(bonusAmount * 100) / 100,
     };
   });
 }
