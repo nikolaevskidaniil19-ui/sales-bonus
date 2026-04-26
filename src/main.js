@@ -6,9 +6,8 @@
  */
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
-  return (
-    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100)
-  );
+  const discountMultiplier = (100 - purchase.discount) / 100;
+  return purchase.sale_price * purchase.quantity * discountMultiplier;
 }
 
 /**
@@ -108,15 +107,14 @@ function analyzeSalesData(data, options) {
     return {
       seller_id: seller.id,
       name: seller.name,
-      // ИСПОЛЬЗУЕМ toFixed(2) И ПЛЮС, чтобы получить число (стандарт Практикума)
-      revenue: Number(seller.revenue.toFixed(2)),
-      profit: Number(seller.profit.toFixed(2)),
+      revenue: +seller.revenue.toFixed(2), // Именно так
+      profit: +seller.profit.toFixed(2),
       sales_count: seller.sales_count,
       top_products: Object.entries(seller.products_sold)
         .map(([sku, quantity]) => ({ sku, quantity }))
         .sort((a, b) => b.quantity - a.quantity || a.sku.localeCompare(b.sku))
         .slice(0, 10),
-      bonus: Number(bonusAmount.toFixed(2)),
+      bonus: +bonusAmount.toFixed(2),
     };
   });
 }
