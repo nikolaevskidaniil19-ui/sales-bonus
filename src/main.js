@@ -126,9 +126,12 @@ function analyzeSalesData(data, options) {
       .sort((a, b) => {
         // 1. Сначала по количеству (убывание)
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // 2. Если количество равно — строго по алфавиту (возрастание)
-        // Именно это исправит чехарду с SKU_017 и SKU_054 в логах
-        return a.sku < b.sku ? -1 : 1;
+
+        // 2. ВАЖНО: Если количество равно — по убыванию SKU (от SKU_081 к SKU_049)
+        // Именно этого требует твой лог ошибок
+        if (a.sku > b.sku) return -1;
+        if (a.sku < b.sku) return 1;
+        return 0;
       })
       .slice(0, 10);
 
