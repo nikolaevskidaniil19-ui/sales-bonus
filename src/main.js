@@ -82,17 +82,19 @@ function analyzeSalesData(data, options) {
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
+
     seller.sales_count += 1;
     record.items.forEach((item) => {
       const product = productIndex[item.sku];
       if (product) {
-        const itemRevenue = calculateRevenue(item, product);
+        const itemRevenue = calculateRevenue(item, product); // Здесь уже 2 знака
         const cost = product.purchase_price * item.quantity;
 
-        // Накапливаем и сразу прибиваем "хвосты" плавающей точки
+        const itemProfit = itemRevenue - cost;
+
         seller.revenue = Math.round((seller.revenue + itemRevenue) * 100) / 100;
-        seller.profit =
-          Math.round((seller.profit + (itemRevenue - cost)) * 100) / 100;
+        // Округляем прибыль после каждого добавленного товара
+        seller.profit = Math.round((seller.profit + itemProfit) * 100) / 100;
 
         seller.products_sold[item.sku] =
           (seller.products_sold[item.sku] || 0) + item.quantity;
@@ -113,19 +115,16 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // ВАЖНО: В логе SKU_081 стоит ВЫШЕ SKU_049.
-        // Это сортировка по убыванию названия (Z-A).
-        if (a.sku > b.sku) return -1;
-        if (a.sku < b.sku) return 1;
-        return 0;
+        // Исправлено на алфавитный порядок (A-Z)
+        return a.sku.localeCompare(b.sku);
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue,
-      profit: seller.profit,
+      revenue: seller.revenue, // уже округлено
+      profit: seller.profit, // уже округлено
       sales_count: seller.sales_count,
       top_products: topProducts,
       bonus: Number(bonusAmount.toFixed(2)),
