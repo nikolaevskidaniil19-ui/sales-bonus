@@ -124,11 +124,10 @@ function analyzeSalesData(data, options) {
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
+        // 1. По количеству (убывание)
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // 3. Алфавитный порядок (Алексей Petrov ждет именно это)
-        if (a.sku < b.sku) return -1;
-        if (a.sku > b.sku) return 1;
-        return 0;
+        // 2. По алфавиту (возрастание) — это исправит порядок SKU
+        return a.sku.localeCompare(b.sku);
       })
       .slice(0, 10);
 
