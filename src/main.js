@@ -20,10 +20,10 @@ function calculateSimpleRevenue(purchase, _product) {
 function calculateBonusByProfit(index, total, seller) {
   // @TODO: Расчет бонуса от позиции в рейтинге
   const { profit } = seller;
-  if (index === 0) return profit * 0.15; // 1 место
-  if (index === 1 || index === 2) return profit * 0.1; // 2 и 3 места
-  if (index === total - 1) return 0; // Последнее место
-  return profit * 0.05; // Остальные
+  if (total > 1 && index === total - 1) return 0;
+  if (index === 0) return profit * 0.15;
+  if (index === 1 || index === 2) return profit * 0.1;
+  return profit * 0.05;
 }
 
 /**
@@ -57,7 +57,7 @@ function analyzeSalesData(data, options) {
     throw new Error("Некорректные входные данные");
   }
 
-  // 2. Проверка на ПУСТЫЕ массивы (исправляет ваши упавшие тесты)
+  // 2. Проверка на пустые массивы (тесты на throw Error)
   if (
     data.sellers.length === 0 ||
     data.products.length === 0 ||
@@ -66,15 +66,10 @@ function analyzeSalesData(data, options) {
     throw new Error("Данные не могут быть пустыми");
   }
 
-  // 3. Проверка наличия функций расчета в options
-  if (!options || !options.calculateRevenue || !options.calculateBonus) {
-    throw new Error("Отсутствуют функции расчета");
-  }
-
   const { calculateRevenue, calculateBonus } = options;
   const productIndex = Object.fromEntries(data.products.map((p) => [p.sku, p]));
 
-  // Подготовка данных продавцов
+  // Подготовка объектов продавцов
   const sellerStats = data.sellers.map((seller) => ({
     id: String(seller.id),
     name: `${seller.first_name} ${seller.last_name}`,
@@ -86,7 +81,7 @@ function analyzeSalesData(data, options) {
 
   const sellerIndex = Object.fromEntries(sellerStats.map((s) => [s.id, s]));
 
-  // Обработка записей о продажах
+  // Обработка продаж
   data.purchase_records.forEach((record) => {
     const seller = sellerIndex[String(record.seller_id)];
     if (!seller) return;
@@ -99,6 +94,7 @@ function analyzeSalesData(data, options) {
         const itemRevenue = calculateRevenue(item, product);
         const cost = product.purchase_price * item.quantity;
 
+        // Копим без округления, чтобы не терять точность
         seller.revenue += itemRevenue;
         seller.profit += itemRevenue - cost;
 
@@ -110,22 +106,22 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // Округляем показатели ПЕРЕД сортировкой для точности рейтинга
-  sellerStats.forEach((s) => {
-    s.profit = +s.profit.toFixed(2);
-    s.revenue = +s.revenue.toFixed(2);
+  // Сортировка: по прибыли (DESC), при равенстве — по ID (ASC)
+  // Прибыль сравниваем как есть, округлим в финальном маппинге
+  sellerStats.sort((a, b) => {
+    const diff = b.profit - a.profit;
+    if (Math.abs(diff) > 0.001) return diff;
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 
-  // Сортировка: сначала по прибыли, если она равна — по ID (для стабильности тестов)
-  sellerStats.sort((a, b) => b.profit - a.profit || a.id.localeCompare(b.id));
-
-  // Формирование итогового массива
+  // Формирование итогового отчета
   return sellerStats.map((seller, index, array) => {
     const bonusAmount = calculateBonus(index, array.length, seller);
 
+    // Топ-10 товаров
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({
-        sku: sku, // Убираем Number(), оставляем как есть (строку "SKU_023")
+        sku: sku, // Оставляем строкой ("SKU_023"), чтобы не было NaN
         quantity: quantity,
       }))
       .sort((a, b) => b.quantity - a.quantity || a.sku.localeCompare(b.sku))
@@ -134,11 +130,12 @@ function analyzeSalesData(data, options) {
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue,
-      profit: seller.profit,
+      // Финальное округление через Math.round для точности в копейках
+      revenue: Math.round(seller.revenue * 100) / 100,
+      profit: Math.round(seller.profit * 100) / 100,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      bonus: +bonusAmount.toFixed(2),
+      bonus: Math.round(bonusAmount * 100) / 100,
     };
   });
 }
