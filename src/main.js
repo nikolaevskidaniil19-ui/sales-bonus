@@ -124,21 +124,22 @@ function analyzeSalesData(data, options) {
     const topProducts = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
-        // 1. По количеству (убывание)
+        // 1. Сначала по количеству (убывание)
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // 2. По алфавиту (возрастание) — это исправит порядок SKU
-        return a.sku.localeCompare(b.sku);
+        // 2. Если количество равно — строго по алфавиту (возрастание)
+        // Именно это исправит чехарду с SKU_017 и SKU_054 в логах
+        return a.sku < b.sku ? -1 : 1;
       })
       .slice(0, 10);
 
     return {
       seller_id: seller.id,
       name: seller.name,
-      revenue: seller.revenue, // Здесь уже будут чистые числа без хвостов
+      revenue: seller.revenue,
       profit: seller.profit,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
+      bonus: Math.round((bonusAmount + 0.0001) * 100) / 100,
     };
   });
 }
