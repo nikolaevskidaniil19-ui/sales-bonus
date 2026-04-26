@@ -7,7 +7,7 @@
 function calculateSimpleRevenue(purchase, _product) {
   // @TODO: Расчет выручки от операции
   return (
-    (purchase.sale_price * purchase.quantity * (100 - purchase.discount)) / 100
+    purchase.sale_price * purchase.quantity * (1 - purchase.discount / 100)
   );
 }
 
@@ -110,11 +110,11 @@ function analyzeSalesData(data, options) {
 
   // 4. Формирование результата
   return sellerStats.map((seller, index, array) => {
-    // Округляем прибыль и выручку только перед расчетом бонуса и возвратом
+    // 1. Округляем показатели ПЕРЕД расчетом бонуса
     const roundedProfit = Math.round(seller.profit * 100) / 100;
     const roundedRevenue = Math.round(seller.revenue * 100) / 100;
 
-    // Передаем в бонус округленную прибыль
+    // 2. Считаем бонус, используя округленную прибыль
     const bonusAmount = calculateBonus(index, array.length, {
       ...seller,
       profit: roundedProfit,
@@ -124,7 +124,7 @@ function analyzeSalesData(data, options) {
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
         if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-        // Строгая алфавитная сортировка для SKU (исправляет падение на SKU_049/081)
+        // Строгий алфавитный порядок (исправляет сдвиг SKU в логах)
         if (a.sku < b.sku) return -1;
         if (a.sku > b.sku) return 1;
         return 0;
@@ -138,7 +138,8 @@ function analyzeSalesData(data, options) {
       profit: roundedProfit,
       sales_count: seller.sales_count,
       top_products: topProducts,
-      bonus: Math.round((bonusAmount + Number.EPSILON) * 100) / 100,
+      // Используем EPSILON, чтобы превратить .565 в .57
+      bonus: Math.round((bonusAmount + 0.00001) * 100) / 100,
     };
   });
 }
